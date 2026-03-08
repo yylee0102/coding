@@ -65,7 +65,38 @@ public class OrderService {
         // * 각 Product 의 재고를 수정
         // * placeOrder 메소드의 시그니처는 변경하지 않은 채 구현하세요.
 
+        Order order = Order.builder()
+                .customerName(customerName)
+                .customerEmail(customerEmail)
+                .status(Order.OrderStatus.PENDING)
+                .orderDate(LocalDateTime.now())
+                .items(new ArrayList<>())
+                .totalAmount(BigDecimal.ZERO)
+                .build();
         
+        for (int i = 0; i < productIds.size(); i++) {
+            Long productId = productIds.get(i);
+            Integer quantity = quantities.get(i);
+            Product product = productRepository.findById(productId)
+                    .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
+            if (quantity <= 0) {
+                throw new IllegalArgumentException("Quantity must be positive: " + quantity);
+            }
+            if (product.getStockQuantity() < quantity) {
+                throw new IllegalStateException("Insufficient stock for product " + productId);
+            }
+            OrderItem item = OrderItem.builder()
+                    .order(order)
+                    .product(product)
+                    .quantity(quantity)
+                    .price(product.getPrice())
+                    .build();
+                  
+            order.getItems().add(item);
+            product.decreaseStock(quantity);
+        }
+
+        return orderRepository.save(order);
     }
 
     /**
