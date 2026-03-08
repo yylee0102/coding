@@ -77,4 +77,17 @@ public class ProductService {
             productRepository.save(p); // 루프마다 저장 (비효율적)
         }
     }
+// 1. `ProductService#findProductsByCategory`에서 카테고리별 제품 조회 메소드 구현
+ 
+    public List<Product> findProductsByCategory(String category) {
+
+        List<Product> products = List.of();
+        for(Product p : productRepository.findAll()) {
+            if(p.getCategory().equals(category)) {
+                products.add(p);
+        }
+        return products;
+
+        }
+    }
 }
