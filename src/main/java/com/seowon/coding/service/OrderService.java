@@ -26,6 +26,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final ProcessingStatusRepository processingStatusRepository;
+    private final OrderShipmentProcessor orderShipmentProcessor;
     
     @Transactional(readOnly = true)
     public List<Order> getAllOrders() {
@@ -165,26 +166,35 @@ public class OrderService {
      * - 리뷰 포인트: proxy 및 transaction 분리, 예외 전파/롤백 범위, 가독성 등
      * - 상식적인 수준에서 요구사항(기획)을 가정하며 최대한 상세히 작성하세요.
      */
+
     @Transactional
     public void bulkShipOrdersParent(String jobId, List<Long> orderIds) {
+        if (orderIds == null || orderIds.isEmpty()) {
+            throw new IllegalArgumentException("orderIds required");
+        }
+
         ProcessingStatus ps = processingStatusRepository.findByJobId(jobId)
                 .orElseGet(() -> processingStatusRepository.save(ProcessingStatus.builder().jobId(jobId).build()));
-        ps.markRunning(orderIds == null ? 0 : orderIds.size());
-        processingStatusRepository.save(ps);
+        ps.markRunning(orderIds.size());
+//        processingStatusRepository.save(ps);
 
         int processed = 0;
-        for (Long orderId : (orderIds == null ? List.<Long>of() : orderIds)) {
+        for (Long orderId :  orderIds) {
             try {
+                
+                orderShipmentProcessor.processSingleOrder(jobId, orderId, ++processed, orderIds.size());
+
                 // 오래 걸리는 작업 이라는 가정 시뮬레이션 (예: 외부 시스템 연동, 대용량 계산 등)
                 orderRepository.findById(orderId).ifPresent(o -> o.setStatus(Order.OrderStatus.PROCESSING));
                 // 중간 진행률 저장
                 this.updateProgressRequiresNew(jobId, ++processed, orderIds.size());
             } catch (Exception e) {
+                log.error("주문 처리 오류 발생", e);
             }
         }
-        ps = processingStatusRepository.findByJobId(jobId).orElse(ps);
+        
         ps.markCompleted();
-        processingStatusRepository.save(ps);
+        
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -194,5 +204,25 @@ public class OrderService {
         ps.updateProgress(processed, total);
         processingStatusRepository.save(ps);
     }
+
+
+   // 5. 코드 리뷰: `OrderService#bulkShipOrdersParent`의 구현코드 리뷰
+   @Component
+   @RequiredArgsConstructor
+   public class OrderShipmentProcessor {
+       
+       private final OrderRepository orderRepository;
+       
+       @Transactional(propagation = Propagation.REQUIRES_NEW)
+       public void processSingleOrder(String jobId, Long orderId, int processed, int total) {
+           // 주문 처리 로직 (예: 외부 시스템 연동, 대용량 계산 등)
+           orderRepository.findById(orderId).ifPresent(o -> o.setStatus(Order.OrderStatus.PROCESSING));
+       }
+    }
+
+    // 1. processingStatusRepository.save(ps) 를 지운 이유는 JPA의 변경 감지(Dirty Checking) 기능 떄문입니다.
+    // 2. OrdershipmentProcessor 를 별도의 컴포넌트로 분리한 이유는 프록시 패턴 때문입니다. 
+    // 3. if (orderIds == null || orderIds.isEmpty()) { hrow new IllegalArgumentException("orderIds required"); 는 for문은 반복문에 대한 일을 처리하고 null 값에 대한 처리는 중복되지 않게 한번만 처리하게 하기 위해서입니다.        }
+    // 4. log.error는 예외 전파를 하기 위해서입니다.
 
 }
