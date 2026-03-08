@@ -66,6 +66,22 @@ public class OrderController {
      *   ]
      * }
      */
-    //
+    //  
+    
+    @PostMapping
+    public ResponseEntity<Order> placeOrder(@RequestBody String customerName,@RequestBody String customerEmail, @RequestBody List<Long> productIds, @RequestBody List<Integer> quantities) {
+        // TODO #2: 구현 항목
+        // 1. Request DTO 를 받아서 주문 생성
+        // 2. orderService.placeOrder 호출
+        // 3. 주문 생성시 HTTP 201 CREATED 반환
+        // 4. 필요한 DTO 생성
+        // private List<OrderItem> items = new ArrayList<>();
+        // placeOrder(String customerName, String customerEmail, List<Long> productIds, List<Integer> quantities)
+        
 
+        Order order = orderService.placeOrder(customerName, customerEmail, productIds, quantities);
+
+
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
 }
